@@ -60,6 +60,4 @@ API docs at http://localhost:8000/docs
 
 ## Notes
 
-- First run downloads the TTS model (~100MB)
-- On macOS, if you get fork safety errors, the start script handles it
 - Max upload size is 500MB by default
