@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 100">
+  <!-- Voynich-inspired botanical motif -->
+  <g fill="none" stroke="#5a7247" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Central stem -->
+    <path d="M70 95 Q70 50 70 15"/>
+
+    <!-- Left branch -->
+    <path d="M70 70 Q55 65 45 72"/>
+    <path d="M70 55 Q50 50 38 58"/>
+    <path d="M70 40 Q52 35 45 42"/>
+
+    <!-- Right branch -->
+    <path d="M70 70 Q85 65 95 72"/>
+    <path d="M70 55 Q90 50 102 58"/>
+    <path d="M70 40 Q88 35 95 42"/>
+
+    <!-- Left leaves -->
+    <ellipse cx="40" cy="72" rx="12" ry="6" fill="#8fa876" fill-opacity="0.3" transform="rotate(-15 40 72)"/>
+    <ellipse cx="33" cy="58" rx="14" ry="7" fill="#8fa876" fill-opacity="0.25" transform="rotate(-20 33 58)"/>
+    <ellipse cx="40" cy="42" rx="11" ry="5" fill="#8fa876" fill-opacity="0.2" transform="rotate(-10 40 42)"/>
+
+    <!-- Right leaves -->
+    <ellipse cx="100" cy="72" rx="12" ry="6" fill="#8fa876" fill-opacity="0.3" transform="rotate(15 100 72)"/>
+    <ellipse cx="107" cy="58" rx="14" ry="7" fill="#8fa876" fill-opacity="0.25" transform="rotate(20 107 58)"/>
+    <ellipse cx="100" cy="42" rx="11" ry="5" fill="#8fa876" fill-opacity="0.2" transform="rotate(10 100 42)"/>
+
+    <!-- Top flower/bud -->
+    <circle cx="70" cy="12" r="8" fill="#a8c090" fill-opacity="0.4"/>
+    <path d="M62 12 Q70 2 78 12" stroke-width="1"/>
+    <path d="M65 8 Q70 4 75 8" stroke-width="0.8"/>
+
+    <!-- Small decorative dots (like Voynich manuscript) -->
+    <circle cx="70" cy="28" r="2" fill="#5a7247" fill-opacity="0.4"/>
+    <circle cx="70" cy="85" r="2" fill="#5a7247" fill-opacity="0.4"/>
+  </g>
+</svg>

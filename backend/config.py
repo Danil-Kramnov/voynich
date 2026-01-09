@@ -1,0 +1,19 @@
+from pydantic_settings import BaseSettings
+from functools import lru_cache
+
+class Settings(BaseSettings):
+    database_url: str
+    redis_url: str
+    upload_dir: str = "../data/uploads"
+    output_dir: str = "../data/outputs"
+    voices_dir: str = "../data/voices"
+    max_file_size: int = 524288000
+    celery_broker_url: str
+    celery_result_backend: str
+    
+    class Config:
+        env_file = ".env"
+
+@lru_cache()
+def get_settings():
+    return Settings()

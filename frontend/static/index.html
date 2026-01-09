@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voynich - Audiobook Converter</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo-section">
+                <div class="botanical-accent"></div>
+                <h1>Voynich</h1>
+                <p class="tagline">Transform your documents into audiobooks</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section card">
+                <h2>Upload Document</h2>
+
+                <div class="drop-zone" id="dropZone">
+                    <div class="drop-zone-content">
+                        <svg class="upload-icon" viewBox="0 0 24 24">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="12" y1="18" x2="12" y2="12"/>
+                            <line x1="9" y1="15" x2="12" y2="12"/>
+                            <line x1="15" y1="15" x2="12" y2="12"/>
+                        </svg>
+                        <p>Drag & drop your document here</p>
+                        <span class="divider">or</span>
+                        <button type="button" class="btn btn-secondary" id="browseBtn">
+                            Browse Files
+                        </button>
+                        <input type="file" id="fileInput" hidden
+                               accept=".pdf,.doc,.docx,.epub,.fb2,.mobi">
+                    </div>
+                    <p class="supported-formats">
+                        Supported: PDF, DOC, DOCX, EPUB, FB2, MOBI
+                    </p>
+                </div>
+
+                <div class="selected-file" id="selectedFile" hidden>
+                    <div class="file-info">
+                        <svg class="file-icon" viewBox="0 0 24 24">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        <span class="file-name" id="fileName"></span>
+                        <button type="button" class="btn-icon" id="removeFile" aria-label="Remove file">
+                            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Voice Selection Section -->
+            <section class="voice-section card">
+                <h2>Select Voice</h2>
+
+                <div class="form-group">
+                    <label for="voiceSelect">Voice Profile</label>
+                    <select id="voiceSelect" class="form-control">
+                        <option value="">Default Voice</option>
+                    </select>
+                </div>
+
+                <div class="custom-voice-section">
+                    <button type="button" class="btn btn-text" id="toggleCustomVoice">
+                        + Add Custom Voice
+                    </button>
+
+                    <div class="custom-voice-form" id="customVoiceForm" hidden>
+                        <div class="form-group">
+                            <label for="voiceName">Voice Name</label>
+                            <input type="text" id="voiceName" class="form-control"
+                                   placeholder="My Custom Voice">
+                        </div>
+                        <div class="form-group">
+                            <label for="voiceFile">Voice Sample (WAV/MP3)</label>
+                            <input type="file" id="voiceFile" class="form-control"
+                                   accept=".wav,.mp3">
+                        </div>
+                        <button type="button" class="btn btn-secondary" id="uploadVoiceBtn">
+                            Upload Voice
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Convert Button -->
+            <button type="button" class="btn btn-primary btn-large" id="convertBtn" disabled>
+                Convert to Audiobook
+            </button>
+
+            <!-- Progress Section -->
+            <section class="progress-section card" id="progressSection" hidden>
+                <h2>Conversion Progress</h2>
+
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-info">
+                        <span class="progress-status" id="progressStatus">Pending...</span>
+                        <span class="progress-percent" id="progressPercent">0%</span>
+                    </div>
+                </div>
+
+                <div class="status-message" id="statusMessage"></div>
+            </section>
+
+            <!-- Result Section -->
+            <section class="result-section card" id="resultSection" hidden>
+                <h2>Your Audiobook is Ready</h2>
+
+                <div class="audio-player">
+                    <audio id="audioPlayer" controls>
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+
+                <div class="result-actions">
+                    <a class="btn btn-primary" id="downloadBtn" download>
+                        Download Audiobook
+                    </a>
+                    <button type="button" class="btn btn-secondary" id="newConversionBtn">
+                        Convert Another
+                    </button>
+                </div>
+            </section>
+
+            <!-- Error Section -->
+            <section class="error-section card" id="errorSection" hidden>
+                <div class="error-content">
+                    <svg class="error-icon" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    <h3>Conversion Failed</h3>
+                    <p id="errorMessage"></p>
+                    <button type="button" class="btn btn-secondary" id="retryBtn">
+                        Try Again
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Voynich Audiobook Converter</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
