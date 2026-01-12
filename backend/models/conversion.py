@@ -8,10 +8,11 @@ class ConversionStatus(enum.Enum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 class Conversion(Base):
     __tablename__ = "conversions"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String, nullable=False)
     file_format = Column(String, nullable=False)
@@ -21,8 +22,11 @@ class Conversion(Base):
     progress = Column(Float, default=0.0)
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     task_id = Column(String, nullable=True)
+    chunks_total = Column(Integer, nullable=True)
+    chunks_completed = Column(Integer, default=0)
 
 class VoiceProfile(Base):
     __tablename__ = "voice_profiles"

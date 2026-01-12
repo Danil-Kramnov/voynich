@@ -6,7 +6,10 @@ const state = {
     selectedVoiceId: null,
     conversionId: null,
     pollingInterval: null,
-    voices: []
+    voices: [],
+    theme: 'light',
+    tasks: [],
+    taskPollingInterval: null
 };
 
 // API Configuration
@@ -15,6 +18,9 @@ const POLLING_INTERVAL = 2000;
 
 // DOM Elements
 const elements = {
+    // Theme
+    themeToggle: null,
+
     // Upload
     dropZone: null,
     fileInput: null,
@@ -40,6 +46,7 @@ const elements = {
     progressStatus: null,
     progressPercent: null,
     statusMessage: null,
+    cancelBtn: null,
 
     // Result
     resultSection: null,
@@ -50,17 +57,26 @@ const elements = {
     // Error
     errorSection: null,
     errorMessage: null,
-    retryBtn: null
+    retryBtn: null,
+
+    // Task Manager
+    taskManager: null,
+    taskList: null,
+    taskEmpty: null
 };
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', () => {
     initializeElements();
     initializeEventListeners();
+    initializeTheme();
     loadVoices();
+    loadTasks();
 });
 
 function initializeElements() {
+    elements.themeToggle = document.getElementById('themeToggle');
+
     elements.dropZone = document.getElementById('dropZone');
     elements.fileInput = document.getElementById('fileInput');
     elements.browseBtn = document.getElementById('browseBtn');
@@ -82,6 +98,7 @@ function initializeElements() {
     elements.progressStatus = document.getElementById('progressStatus');
     elements.progressPercent = document.getElementById('progressPercent');
     elements.statusMessage = document.getElementById('statusMessage');
+    elements.cancelBtn = document.getElementById('cancelBtn');
 
     elements.resultSection = document.getElementById('resultSection');
     elements.audioPlayer = document.getElementById('audioPlayer');
@@ -91,9 +108,16 @@ function initializeElements() {
     elements.errorSection = document.getElementById('errorSection');
     elements.errorMessage = document.getElementById('errorMessage');
     elements.retryBtn = document.getElementById('retryBtn');
+
+    elements.taskManager = document.getElementById('taskManager');
+    elements.taskList = document.getElementById('taskList');
+    elements.taskEmpty = document.getElementById('taskEmpty');
 }
 
 function initializeEventListeners() {
+    // Theme toggle
+    elements.themeToggle.addEventListener('click', toggleTheme);
+
     // File upload events
     elements.dropZone.addEventListener('dragover', handleDragOver);
     elements.dropZone.addEventListener('dragleave', handleDragLeave);
@@ -113,6 +137,7 @@ function initializeEventListeners() {
 
     // Conversion events
     elements.convertBtn.addEventListener('click', startConversion);
+    elements.cancelBtn.addEventListener('click', cancelConversion);
     elements.newConversionBtn.addEventListener('click', resetToInitialState);
     elements.retryBtn.addEventListener('click', resetToInitialState);
 }
@@ -269,9 +294,8 @@ async function startConversion() {
     }
 
     try {
-        showSection('progress');
-        updateProgress(0, 'pending', 'Uploading file...');
         elements.convertBtn.disabled = true;
+        elements.convertBtn.textContent = 'Uploading...';
 
         const response = await fetch(`${API_BASE}/conversion/upload`, {
             method: 'POST',
@@ -284,12 +308,44 @@ async function startConversion() {
         }
 
         const conversion = await response.json();
-        state.conversionId = conversion.id;
 
-        startPolling();
+        // Clear selected file and refresh task list
+        clearSelectedFile();
+        elements.convertBtn.textContent = 'Convert to Audiobook';
+
+        // Load and show task manager
+        await loadTasks();
 
     } catch (error) {
-        showError(`Conversion failed: ${error.message}`);
+        alert(`Upload failed: ${error.message}`);
+        elements.convertBtn.disabled = false;
+        elements.convertBtn.textContent = 'Convert to Audiobook';
+    }
+}
+
+async function cancelConversion() {
+    if (!state.conversionId) return;
+
+    try {
+        elements.cancelBtn.disabled = true;
+        elements.cancelBtn.textContent = 'Cancelling...';
+
+        const response = await fetch(`${API_BASE}/conversion/cancel/${state.conversionId}`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Cancel failed');
+        }
+
+        stopPolling();
+        resetToInitialState();
+
+    } catch (error) {
+        alert(`Failed to cancel: ${error.message}`);
+        elements.cancelBtn.disabled = false;
+        elements.cancelBtn.textContent = 'Cancel Conversion';
     }
 }
 
@@ -340,6 +396,11 @@ function handleStatusUpdate(conversion) {
         case 'failed':
             stopPolling();
             showError(error_message || 'Conversion failed. Please try again.');
+            break;
+
+        case 'cancelled':
+            stopPolling();
+            resetToInitialState();
             break;
     }
 }
@@ -408,9 +469,192 @@ function resetToInitialState() {
     state.selectedVoiceId = null;
     elements.convertBtn.disabled = true;
 
+    elements.cancelBtn.disabled = false;
+    elements.cancelBtn.textContent = 'Cancel Conversion';
+
     elements.progressSection.hidden = true;
     elements.resultSection.hidden = true;
     elements.errorSection.hidden = true;
 
     updateProgress(0, 'pending', '');
+}
+
+// Theme Management
+function initializeTheme() {
+    const savedTheme = localStorage.getItem('voynich-theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    state.theme = savedTheme || (prefersDark ? 'dark' : 'light');
+    applyTheme(state.theme);
+}
+
+function toggleTheme() {
+    state.theme = state.theme === 'light' ? 'dark' : 'light';
+    applyTheme(state.theme);
+    localStorage.setItem('voynich-theme', state.theme);
+}
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+}
+
+// Task Manager
+async function loadTasks() {
+    try {
+        const response = await fetch(`${API_BASE}/conversion/list`);
+        if (!response.ok) throw new Error('Failed to load tasks');
+
+        state.tasks = await response.json();
+        renderTaskList();
+
+        if (state.tasks.length > 0) {
+            startTaskPolling();
+        }
+    } catch (error) {
+        console.error('Error loading tasks:', error);
+    }
+}
+
+function startTaskPolling() {
+    if (state.taskPollingInterval) {
+        clearInterval(state.taskPollingInterval);
+    }
+
+    state.taskPollingInterval = setInterval(loadTasks, POLLING_INTERVAL);
+}
+
+function stopTaskPolling() {
+    if (state.taskPollingInterval) {
+        clearInterval(state.taskPollingInterval);
+        state.taskPollingInterval = null;
+    }
+}
+
+function renderTaskList() {
+    const hasTasks = state.tasks.length > 0;
+
+    elements.taskManager.hidden = !hasTasks;
+    elements.taskEmpty.hidden = hasTasks;
+
+    if (!hasTasks) {
+        elements.taskList.innerHTML = '';
+        stopTaskPolling();
+        return;
+    }
+
+    elements.taskList.innerHTML = state.tasks.map(task => createTaskItemHTML(task)).join('');
+
+    // Attach cancel button listeners
+    elements.taskList.querySelectorAll('.task-cancel').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const taskId = e.target.closest('.task-item').dataset.id;
+            cancelTask(taskId);
+        });
+    });
+
+    // Auto-remove completed/failed/cancelled tasks after delay
+    state.tasks.forEach(task => {
+        if (['completed', 'failed', 'cancelled'].includes(task.status)) {
+            setTimeout(() => removeTask(task.id), 5000);
+        }
+    });
+}
+
+function createTaskItemHTML(task) {
+    const eta = formatETA(task);
+    const canCancel = ['pending', 'processing'].includes(task.status);
+
+    return `
+        <div class="task-item ${task.status}" data-id="${task.id}">
+            <div class="task-header">
+                <span class="task-filename">${escapeHTML(task.filename)}</span>
+                ${canCancel ? `
+                    <button class="btn-icon task-cancel" aria-label="Cancel conversion">
+                        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                ` : ''}
+            </div>
+            <div class="task-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${task.progress}%"></div>
+                </div>
+            </div>
+            <div class="task-info">
+                <span class="task-status">${task.status}</span>
+                <span class="task-eta">${eta}</span>
+                <span class="task-percent">${Math.round(task.progress)}%</span>
+            </div>
+        </div>
+    `;
+}
+
+function formatETA(task) {
+    if (task.status === 'pending') {
+        return 'Waiting...';
+    }
+
+    if (task.status === 'completed') {
+        return 'Done';
+    }
+
+    if (task.status === 'failed' || task.status === 'cancelled') {
+        return task.status.charAt(0).toUpperCase() + task.status.slice(1);
+    }
+
+    if (!task.estimated_seconds_remaining || task.estimated_seconds_remaining <= 0) {
+        return 'Calculating...';
+    }
+
+    const seconds = Math.round(task.estimated_seconds_remaining);
+
+    if (seconds < 60) {
+        return '< 1m';
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+
+    if (minutes >= 60) {
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = minutes % 60;
+        return `${hours}h ${remainingMinutes}m`;
+    }
+
+    return `${minutes}m ${remainingSeconds}s`;
+}
+
+async function cancelTask(taskId) {
+    try {
+        const response = await fetch(`${API_BASE}/conversion/cancel/${taskId}`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Cancel failed');
+        }
+
+        // Refresh task list
+        await loadTasks();
+
+    } catch (error) {
+        alert(`Failed to cancel: ${error.message}`);
+    }
+}
+
+function removeTask(taskId) {
+    const taskElement = elements.taskList.querySelector(`[data-id="${taskId}"]`);
+    if (taskElement) {
+        taskElement.classList.add('removing');
+        setTimeout(() => {
+            state.tasks = state.tasks.filter(t => t.id !== parseInt(taskId));
+            renderTaskList();
+        }, 500);
+    }
+}
+
+function escapeHTML(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
