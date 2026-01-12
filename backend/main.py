@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from api.routes import conversion, voices
 from models.database import engine, Base
 from config import get_settings
@@ -32,6 +32,13 @@ app.mount("/outputs", StaticFiles(directory=settings.output_dir), name="outputs"
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend" / "static"
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+
+@app.get("/favicon.ico")
+async def favicon():
+    favicon_path = FRONTEND_DIR / "assets" / "botanical.svg"
+    if favicon_path.exists():
+        return Response(content=favicon_path.read_bytes(), media_type="image/svg+xml")
+    return Response(status_code=204)
 
 @app.get("/", response_class=HTMLResponse)
 async def root():

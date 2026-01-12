@@ -9,6 +9,7 @@ from tts.chunker import TextChunker
 from audio.processor import AudioProcessor
 from config import get_settings
 import os
+import tempfile
 from datetime import datetime
 
 settings = get_settings()
@@ -55,7 +56,7 @@ def convert_to_audiobook(self, conversion_id: int):
         total_chunks = len(chunks)
         
         for idx, chunk in enumerate(chunks):
-            temp_output = f"/tmp/chunk_{conversion_id}_{idx}.wav"
+            temp_output = os.path.join(tempfile.gettempdir(), f"chunk_{conversion_id}_{idx}.mp3")
             tts_manager.synthesize(chunk, temp_output, voice_file)
             temp_audio_files.append(temp_output)
             

@@ -1,18 +1,12 @@
-from TTS.api import TTS
+import edge_tts
+import asyncio
 import os
 from typing import Optional
 
 class TTSManager:
     def __init__(self, voices_dir: str):
         self.voices_dir = voices_dir
-        self.model = None
-        self._initialize_model()
-
-    def _initialize_model(self):
-        # Use a smaller, faster English TTS model
-        # This model doesn't require voice cloning but is more reliable
-        os.environ['COQUI_TOS_AGREED'] = '1'
-        self.model = TTS("tts_models/en/ljspeech/tacotron2-DDC")
+        self.default_voice = "en-US-AriaNeural"
 
     def synthesize(
         self,
@@ -21,19 +15,25 @@ class TTSManager:
         voice_file: Optional[str] = None,
         language: str = "en"
     ) -> str:
-        # Note: This simpler model doesn't support voice cloning
-        # voice_file parameter is kept for API compatibility
-        self.model.tts_to_file(
-            text=text,
-            file_path=output_path
-        )
+        # Use voice parameter or default
+        voice = self.default_voice
+        if voice_file:
+            # voice_file can be used to specify an edge-tts voice name
+            voice = voice_file
 
+        # Run async edge-tts in sync context
+        asyncio.run(self._synthesize_async(text, output_path, voice))
         return output_path
-    
+
+    async def _synthesize_async(self, text: str, output_path: str, voice: str):
+        communicate = edge_tts.Communicate(text, voice)
+        await communicate.save(output_path)
+
     def get_available_voices(self):
-        voices = []
-        if os.path.exists(self.voices_dir):
-            for file in os.listdir(self.voices_dir):
-                if file.endswith(('.wav', '.mp3')):
-                    voices.append(file)
+        """Return list of available edge-tts voices"""
+        voices = asyncio.run(self._get_voices_async())
         return voices
+
+    async def _get_voices_async(self):
+        voices = await edge_tts.list_voices()
+        return [v["ShortName"] for v in voices]

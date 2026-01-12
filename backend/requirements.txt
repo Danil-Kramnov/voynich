@@ -19,10 +19,10 @@ beautifulsoup4>=4.12.0,<5.0.0
 lxml>=4.9.0,<5.0.0
 
 # TTS and audio processing
-TTS>=0.20.0,<1.0.0
+edge-tts>=6.1.0,<7.0.0
 pydub>=0.25.0,<1.0.0
 soundfile>=0.12.0,<1.0.0
-numpy>=1.22.0,<1.25.0
+numpy>=1.22.0,<2.0.0
 
 # Utilities
 python-multipart>=0.0.6,<1.0.0

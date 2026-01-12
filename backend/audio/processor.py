@@ -8,7 +8,7 @@ class AudioProcessor:
         combined = AudioSegment.empty()
         
         for file_path in file_paths:
-            audio = AudioSegment.from_wav(file_path)
+            audio = AudioSegment.from_file(file_path)
             combined += audio
         
         combined.export(output_path, format="mp3", bitrate="128k")
