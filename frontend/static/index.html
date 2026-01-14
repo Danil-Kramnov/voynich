@@ -123,12 +123,29 @@
             </button>
 
             <!-- Task Manager Section -->
-            <section class="task-manager card" id="taskManager" hidden>
-                <h2>Conversion Queue</h2>
-                <div class="task-list" id="taskList">
-                    <!-- Task items rendered dynamically by JavaScript -->
+            <section class="task-manager card" id="taskManager">
+                <h2>
+                    <span>Conversion Queue</span>
+                    <div class="task-actions">
+                        <button type="button" class="btn btn-danger" id="cancelAllBtn" title="Cancel all active conversions" hidden>
+                            Cancel All
+                        </button>
+                        <button type="button" class="btn btn-ghost" id="clearCompletedBtn" title="Clear old tasks from database">
+                            Clear History
+                        </button>
+                    </div>
+                </h2>
+                <div class="task-table-header" id="taskTableHeader" hidden>
+                    <span>Name</span>
+                    <span>Progress</span>
+                    <span>Status</span>
+                    <span>ETA</span>
+                    <span></span>
                 </div>
-                <p class="task-empty" id="taskEmpty" hidden>No active conversions</p>
+                <div class="task-list" id="taskList">
+                    <!-- Task rows rendered dynamically by JavaScript -->
+                </div>
+                <p class="task-empty" id="taskEmpty">No active conversions</p>
             </section>
 
             <!-- Progress Section -->

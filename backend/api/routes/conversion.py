@@ -91,3 +91,49 @@ async def cancel_conversion(conversion_id: int, db: Session = Depends(get_db)):
     db.refresh(conversion)
 
     return conversion
+
+
+@router.post("/cancel-all")
+async def cancel_all_conversions(db: Session = Depends(get_db)):
+    """Cancel all pending and processing conversions"""
+    active_conversions = db.query(Conversion).filter(
+        Conversion.status.in_([ConversionStatus.PENDING, ConversionStatus.PROCESSING])
+    ).all()
+
+    cancelled_count = 0
+    for conversion in active_conversions:
+        if conversion.task_id:
+            celery_app.control.revoke(conversion.task_id, terminate=True)
+        conversion.status = ConversionStatus.CANCELLED
+        cancelled_count += 1
+
+    db.commit()
+    return {"cancelled": cancelled_count}
+
+
+@router.delete("/clear-completed")
+async def clear_completed_conversions(db: Session = Depends(get_db)):
+    """Remove all completed, failed, and cancelled conversions from database"""
+    deleted = db.query(Conversion).filter(
+        Conversion.status.in_([ConversionStatus.COMPLETED, ConversionStatus.FAILED, ConversionStatus.CANCELLED])
+    ).delete(synchronize_session=False)
+
+    db.commit()
+    return {"deleted": deleted}
+
+
+@router.delete("/{conversion_id}")
+async def delete_conversion(conversion_id: int, db: Session = Depends(get_db)):
+    """Remove a single conversion from database"""
+    conversion = db.query(Conversion).filter(Conversion.id == conversion_id).first()
+
+    if not conversion:
+        raise HTTPException(status_code=404, detail="Conversion not found")
+
+    # Only allow deleting finished conversions
+    if conversion.status in [ConversionStatus.PENDING, ConversionStatus.PROCESSING]:
+        raise HTTPException(status_code=400, detail="Cannot delete active conversion. Cancel it first.")
+
+    db.delete(conversion)
+    db.commit()
+    return {"deleted": True}

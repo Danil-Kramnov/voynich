@@ -1,12 +1,19 @@
 import edge_tts
 import asyncio
 import os
+import re
 from typing import Optional
 
 class TTSManager:
     def __init__(self, voices_dir: str):
         self.voices_dir = voices_dir
         self.default_voice = "en-US-AriaNeural"
+
+    def _normalize_for_tts(self, text: str) -> str:
+        """Normalize text to prevent unwanted pauses in TTS output."""
+        # Replace all whitespace with single spaces
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
 
     def synthesize(
         self,
@@ -15,6 +22,9 @@ class TTSManager:
         voice_file: Optional[str] = None,
         language: str = "en"
     ) -> str:
+        # Normalize text to remove line breaks
+        text = self._normalize_for_tts(text)
+
         # Use voice parameter or default
         voice = self.default_voice
         if voice_file:

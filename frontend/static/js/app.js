@@ -62,7 +62,10 @@ const elements = {
     // Task Manager
     taskManager: null,
     taskList: null,
-    taskEmpty: null
+    taskEmpty: null,
+    taskTableHeader: null,
+    cancelAllBtn: null,
+    clearCompletedBtn: null
 };
 
 // Initialize application
@@ -112,6 +115,9 @@ function initializeElements() {
     elements.taskManager = document.getElementById('taskManager');
     elements.taskList = document.getElementById('taskList');
     elements.taskEmpty = document.getElementById('taskEmpty');
+    elements.taskTableHeader = document.getElementById('taskTableHeader');
+    elements.cancelAllBtn = document.getElementById('cancelAllBtn');
+    elements.clearCompletedBtn = document.getElementById('clearCompletedBtn');
 }
 
 function initializeEventListeners() {
@@ -140,6 +146,10 @@ function initializeEventListeners() {
     elements.cancelBtn.addEventListener('click', cancelConversion);
     elements.newConversionBtn.addEventListener('click', resetToInitialState);
     elements.retryBtn.addEventListener('click', resetToInitialState);
+
+    // Task Manager events
+    elements.cancelAllBtn.addEventListener('click', cancelAllTasks);
+    elements.clearCompletedBtn.addEventListener('click', clearCompletedTasks);
 }
 
 // File Upload Handling
@@ -501,14 +511,18 @@ function applyTheme(theme) {
 // Task Manager
 async function loadTasks() {
     try {
-        const response = await fetch(`${API_BASE}/conversion/list`);
+        const response = await fetch(`${API_BASE}/conversion/list?active_only=false`);
         if (!response.ok) throw new Error('Failed to load tasks');
 
         state.tasks = await response.json();
         renderTaskList();
 
-        if (state.tasks.length > 0) {
+        // Only poll if there are active tasks
+        const hasActiveTasks = state.tasks.some(t => ['pending', 'processing'].includes(t.status));
+        if (hasActiveTasks) {
             startTaskPolling();
+        } else {
+            stopTaskPolling();
         }
     } catch (error) {
         console.error('Error loading tasks:', error);
@@ -533,8 +547,10 @@ function stopTaskPolling() {
 function renderTaskList() {
     const hasTasks = state.tasks.length > 0;
 
-    elements.taskManager.hidden = !hasTasks;
+    // Always show task manager, but toggle inner elements
+    elements.taskTableHeader.hidden = !hasTasks;
     elements.taskEmpty.hidden = hasTasks;
+    elements.cancelAllBtn.hidden = !hasTasks;
 
     if (!hasTasks) {
         elements.taskList.innerHTML = '';
@@ -542,47 +558,85 @@ function renderTaskList() {
         return;
     }
 
-    elements.taskList.innerHTML = state.tasks.map(task => createTaskItemHTML(task)).join('');
+    elements.taskList.innerHTML = state.tasks.map(task => createTaskRowHTML(task)).join('');
 
     // Attach cancel button listeners
-    elements.taskList.querySelectorAll('.task-cancel').forEach(btn => {
+    elements.taskList.querySelectorAll('.task-cancel-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const taskId = e.target.closest('.task-item').dataset.id;
+            e.stopPropagation();
+            const taskId = e.target.closest('.task-row').dataset.id;
             cancelTask(taskId);
         });
     });
 
-    // Auto-remove completed/failed/cancelled tasks after delay
-    state.tasks.forEach(task => {
-        if (['completed', 'failed', 'cancelled'].includes(task.status)) {
-            setTimeout(() => removeTask(task.id), 5000);
-        }
+    // Attach download button listeners
+    elements.taskList.querySelectorAll('.task-download-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
     });
+
+    // Attach remove button listeners
+    elements.taskList.querySelectorAll('.task-remove-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const taskId = e.target.closest('.task-row').dataset.id;
+            removeTaskFromDB(taskId);
+        });
+    });
+
+    // Setup context menu
+    setupContextMenu();
 }
 
-function createTaskItemHTML(task) {
+function createTaskRowHTML(task) {
     const eta = formatETA(task);
     const canCancel = ['pending', 'processing'].includes(task.status);
+    const isCompleted = task.status === 'completed';
+    const isFinished = ['completed', 'failed', 'cancelled'].includes(task.status);
+    const percent = Math.round(task.progress);
+    const isLowProgress = percent < 30;
+
+    let actionsHTML = '';
+    if (canCancel) {
+        actionsHTML = `
+            <button class="task-cancel-btn" aria-label="Cancel conversion" title="Cancel">
+                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        `;
+    } else if (isCompleted && task.output_path) {
+        actionsHTML = `
+            <a class="task-download-btn" href="/outputs/${task.output_path}" download title="Download">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </a>
+            <button class="task-remove-btn" aria-label="Remove from list" title="Remove">
+                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        `;
+    } else if (isFinished) {
+        actionsHTML = `
+            <button class="task-remove-btn" aria-label="Remove from list" title="Remove">
+                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        `;
+    }
 
     return `
-        <div class="task-item ${task.status}" data-id="${task.id}">
-            <div class="task-header">
-                <span class="task-filename">${escapeHTML(task.filename)}</span>
-                ${canCancel ? `
-                    <button class="btn-icon task-cancel" aria-label="Cancel conversion">
-                        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                ` : ''}
+        <div class="task-row ${task.status}" data-id="${task.id}" data-output="${task.output_path || ''}">
+            <div class="task-name">
+                <span class="task-filename" title="${escapeHTML(task.filename)}">${escapeHTML(task.filename)}</span>
             </div>
-            <div class="task-progress">
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${task.progress}%"></div>
+            <div class="task-progress-cell">
+                <div class="task-progress-bar${isLowProgress ? ' low' : ''}">
+                    <div class="task-progress-fill" style="width: ${task.progress}%" data-percent="${percent}%"></div>
                 </div>
             </div>
-            <div class="task-info">
-                <span class="task-status">${task.status}</span>
-                <span class="task-eta">${eta}</span>
-                <span class="task-percent">${Math.round(task.progress)}%</span>
+            <div class="task-status-cell">
+                <span class="task-status-badge ${task.status}">${task.status}</span>
+            </div>
+            <div class="task-eta-cell">${eta}</div>
+            <div class="task-actions-cell">
+                ${actionsHTML}
             </div>
         </div>
     `;
@@ -642,14 +696,174 @@ async function cancelTask(taskId) {
     }
 }
 
+async function cancelAllTasks() {
+    if (!confirm('Cancel all active conversions?')) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/conversion/cancel-all`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Cancel all failed');
+        }
+
+        await loadTasks();
+    } catch (error) {
+        alert(`Failed to cancel all: ${error.message}`);
+    }
+}
+
+async function clearCompletedTasks() {
+    try {
+        const response = await fetch(`${API_BASE}/conversion/clear-completed`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Clear failed');
+        }
+
+        await loadTasks();
+    } catch (error) {
+        alert(`Failed to clear: ${error.message}`);
+    }
+}
+
 function removeTask(taskId) {
-    const taskElement = elements.taskList.querySelector(`[data-id="${taskId}"]`);
+    const taskElement = elements.taskList.querySelector(`.task-row[data-id="${taskId}"]`);
     if (taskElement) {
         taskElement.classList.add('removing');
         setTimeout(() => {
             state.tasks = state.tasks.filter(t => t.id !== parseInt(taskId));
             renderTaskList();
-        }, 500);
+        }, 300);
+    }
+}
+
+async function removeTaskFromDB(taskId) {
+    try {
+        const response = await fetch(`${API_BASE}/conversion/${taskId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Delete failed');
+        }
+
+        await loadTasks();
+    } catch (error) {
+        alert(`Failed to remove: ${error.message}`);
+    }
+}
+
+// Context menu
+let contextMenu = null;
+let contextTaskId = null;
+let contextOutputPath = null;
+
+function setupContextMenu() {
+    // Create context menu if it doesn't exist
+    if (!contextMenu) {
+        contextMenu = document.createElement('div');
+        contextMenu.className = 'context-menu';
+        contextMenu.innerHTML = `
+            <div class="context-menu-item" data-action="download">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download
+            </div>
+            <div class="context-menu-item" data-action="play">
+                <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Play
+            </div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item" data-action="remove">
+                <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/></svg>
+                Remove
+            </div>
+        `;
+        document.body.appendChild(contextMenu);
+
+        // Context menu item clicks
+        contextMenu.querySelectorAll('.context-menu-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const action = e.currentTarget.dataset.action;
+                handleContextAction(action);
+                hideContextMenu();
+            });
+        });
+
+        // Hide on click outside
+        document.addEventListener('click', hideContextMenu);
+        document.addEventListener('contextmenu', (e) => {
+            if (!e.target.closest('.task-row')) {
+                hideContextMenu();
+            }
+        });
+    }
+
+    // Add right-click handlers to task rows
+    elements.taskList.querySelectorAll('.task-row.completed').forEach(row => {
+        row.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            contextTaskId = row.dataset.id;
+            contextOutputPath = row.dataset.output;
+            showContextMenu(e.pageX, e.pageY);
+        });
+    });
+}
+
+function showContextMenu(x, y) {
+    if (!contextMenu) return;
+
+    // Position menu
+    contextMenu.style.left = `${x}px`;
+    contextMenu.style.top = `${y}px`;
+    contextMenu.classList.add('visible');
+
+    // Adjust if off-screen
+    const rect = contextMenu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+        contextMenu.style.left = `${x - rect.width}px`;
+    }
+    if (rect.bottom > window.innerHeight) {
+        contextMenu.style.top = `${y - rect.height}px`;
+    }
+}
+
+function hideContextMenu() {
+    if (contextMenu) {
+        contextMenu.classList.remove('visible');
+    }
+    contextTaskId = null;
+    contextOutputPath = null;
+}
+
+function handleContextAction(action) {
+    if (!contextTaskId) return;
+
+    switch (action) {
+        case 'download':
+            if (contextOutputPath) {
+                const link = document.createElement('a');
+                link.href = `/outputs/${contextOutputPath}`;
+                link.download = contextOutputPath;
+                link.click();
+            }
+            break;
+        case 'play':
+            if (contextOutputPath) {
+                const audioUrl = `/outputs/${contextOutputPath}`;
+                // Open in audio player or new tab
+                window.open(audioUrl, '_blank');
+            }
+            break;
+        case 'remove':
+            removeTaskFromDB(contextTaskId);
+            break;
     }
 }
 
