@@ -4,9 +4,15 @@
 const state = {
     selectedFile: null,
     selectedVoiceId: null,
+    selectedVoiceName: null,
     conversionId: null,
     pollingInterval: null,
     voices: [],
+    edgeVoices: [],
+    filteredVoices: [],
+    currentLocale: 'en-US',
+    currentGender: 'all',
+    playingVoiceId: null,
     theme: 'light',
     tasks: [],
     taskPollingInterval: null
@@ -30,12 +36,13 @@ const elements = {
     removeFile: null,
 
     // Voice
-    voiceSelect: null,
-    toggleCustomVoice: null,
-    customVoiceForm: null,
-    voiceName: null,
-    voiceFile: null,
-    uploadVoiceBtn: null,
+    localeFilter: null,
+    genderFilter: null,
+    voiceGrid: null,
+    selectedVoice: null,
+    selectedVoiceName: null,
+    clearVoice: null,
+    voicePreviewAudio: null,
 
     // Conversion
     convertBtn: null,
@@ -87,12 +94,13 @@ function initializeElements() {
     elements.fileName = document.getElementById('fileName');
     elements.removeFile = document.getElementById('removeFile');
 
-    elements.voiceSelect = document.getElementById('voiceSelect');
-    elements.toggleCustomVoice = document.getElementById('toggleCustomVoice');
-    elements.customVoiceForm = document.getElementById('customVoiceForm');
-    elements.voiceName = document.getElementById('voiceName');
-    elements.voiceFile = document.getElementById('voiceFile');
-    elements.uploadVoiceBtn = document.getElementById('uploadVoiceBtn');
+    elements.localeFilter = document.getElementById('localeFilter');
+    elements.genderFilter = document.querySelector('.gender-filter');
+    elements.voiceGrid = document.getElementById('voiceGrid');
+    elements.selectedVoice = document.getElementById('selectedVoice');
+    elements.selectedVoiceName = document.getElementById('selectedVoiceName');
+    elements.clearVoice = document.getElementById('clearVoice');
+    elements.voicePreviewAudio = document.getElementById('voicePreviewAudio');
 
     elements.convertBtn = document.getElementById('convertBtn');
 
@@ -137,9 +145,10 @@ function initializeEventListeners() {
     elements.removeFile.addEventListener('click', clearSelectedFile);
 
     // Voice events
-    elements.voiceSelect.addEventListener('change', handleVoiceChange);
-    elements.toggleCustomVoice.addEventListener('click', toggleCustomVoiceForm);
-    elements.uploadVoiceBtn.addEventListener('click', uploadCustomVoice);
+    elements.localeFilter.addEventListener('change', handleLocaleChange);
+    elements.genderFilter.addEventListener('click', handleGenderFilter);
+    elements.clearVoice.addEventListener('click', clearSelectedVoice);
+    elements.voicePreviewAudio.addEventListener('ended', handlePreviewEnded);
 
     // Conversion events
     elements.convertBtn.addEventListener('click', startConversion);
@@ -180,11 +189,11 @@ function handleFileSelect(e) {
 }
 
 function validateAndSetFile(file) {
-    const supportedFormats = ['.pdf', '.doc', '.docx', '.epub', '.fb2', '.mobi'];
+    const supportedFormats = ['.pdf', '.doc', '.docx', '.epub', '.fb2', '.mobi', '.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp', '.webp'];
     const ext = '.' + file.name.split('.').pop().toLowerCase();
 
     if (!supportedFormats.includes(ext)) {
-        alert(`Unsupported format: ${ext}\n\nSupported formats: ${supportedFormats.join(', ')}`);
+        alert(`Unsupported format: ${ext}\n\nSupported formats: PDF, DOC, DOCX, EPUB, FB2, MOBI, PNG, JPG, TIFF, BMP, WEBP`);
         return;
     }
 
@@ -210,87 +219,158 @@ function updateConvertButton() {
 // Voice Management
 async function loadVoices() {
     try {
-        const response = await fetch(`${API_BASE}/voices/voices`);
+        elements.voiceGrid.innerHTML = '<div class="voice-loading">Loading voices...</div>';
+
+        const response = await fetch(`${API_BASE}/voices/edge-voices?locale_filter=${state.currentLocale}`);
         if (!response.ok) throw new Error('Failed to load voices');
 
-        state.voices = await response.json();
-        populateVoiceDropdown();
+        state.edgeVoices = await response.json();
+        filterAndRenderVoices();
     } catch (error) {
         console.error('Error loading voices:', error);
+        elements.voiceGrid.innerHTML = '<div class="voice-loading">Failed to load voices</div>';
     }
 }
 
-function populateVoiceDropdown() {
-    while (elements.voiceSelect.options.length > 1) {
-        elements.voiceSelect.remove(1);
-    }
-
-    state.voices.forEach(voice => {
-        const option = document.createElement('option');
-        option.value = voice.id;
-        option.textContent = `${voice.name} (${voice.voice_type})`;
-        elements.voiceSelect.appendChild(option);
+function filterAndRenderVoices() {
+    // Filter by gender
+    state.filteredVoices = state.edgeVoices.filter(voice => {
+        if (state.currentGender === 'all') return true;
+        return voice.gender === state.currentGender;
     });
+
+    renderVoiceGrid();
 }
 
-function handleVoiceChange(e) {
-    state.selectedVoiceId = e.target.value || null;
-}
-
-function toggleCustomVoiceForm() {
-    const isHidden = elements.customVoiceForm.hidden;
-    elements.customVoiceForm.hidden = !isHidden;
-    elements.toggleCustomVoice.textContent = isHidden
-        ? '- Hide Custom Voice'
-        : '+ Add Custom Voice';
-}
-
-async function uploadCustomVoice() {
-    const name = elements.voiceName.value.trim();
-    const file = elements.voiceFile.files[0];
-
-    if (!name || !file) {
-        alert('Please provide both a name and a voice file.');
+function renderVoiceGrid() {
+    if (state.filteredVoices.length === 0) {
+        elements.voiceGrid.innerHTML = '<div class="voice-loading">No voices found</div>';
         return;
     }
 
-    const formData = new FormData();
-    formData.append('file', file);
+    elements.voiceGrid.innerHTML = state.filteredVoices.map(voice => createVoiceCardHTML(voice)).join('');
 
-    try {
-        elements.uploadVoiceBtn.disabled = true;
-        elements.uploadVoiceBtn.textContent = 'Uploading...';
+    // Attach click handlers
+    elements.voiceGrid.querySelectorAll('.voice-card').forEach(card => {
+        const voiceId = card.dataset.voiceId;
 
-        const response = await fetch(`${API_BASE}/voices/upload-voice?name=${encodeURIComponent(name)}`, {
-            method: 'POST',
-            body: formData
+        // Preview button click
+        card.querySelector('.voice-preview-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleVoicePreview(voiceId);
         });
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Upload failed');
-        }
+        // Card click to select
+        card.addEventListener('click', () => {
+            selectVoice(voiceId);
+        });
+    });
+}
 
-        const newVoice = await response.json();
-        state.voices.push(newVoice);
-        populateVoiceDropdown();
+function createVoiceCardHTML(voice) {
+    const isSelected = state.selectedVoiceId === voice.id;
+    const isPlaying = state.playingVoiceId === voice.id;
+    const genderIcon = voice.gender === 'Female'
+        ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M12 13v8"/><path d="M9 18h6"/></svg>'
+        : '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M12 13v8"/><path d="M15 15l3-3"/><path d="M18 15v-3h-3"/></svg>';
 
-        elements.voiceSelect.value = newVoice.id;
-        state.selectedVoiceId = newVoice.id;
+    return `
+        <div class="voice-card${isSelected ? ' selected' : ''}${isPlaying ? ' playing' : ''}" data-voice-id="${voice.id}">
+            <button class="voice-preview-btn" aria-label="Preview voice">
+                <svg class="icon-play" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                <svg class="icon-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            </button>
+            <div class="voice-info">
+                <div class="voice-name">${escapeHTML(voice.name)}</div>
+                <div class="voice-meta">
+                    <span class="voice-gender">${genderIcon}</span>
+                    <span>${voice.locale_name}</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
 
-        elements.voiceName.value = '';
-        elements.voiceFile.value = '';
-        elements.customVoiceForm.hidden = true;
-        elements.toggleCustomVoice.textContent = '+ Add Custom Voice';
+function handleLocaleChange(e) {
+    state.currentLocale = e.target.value;
+    loadVoices();
+}
 
-        alert('Voice uploaded successfully!');
+function handleGenderFilter(e) {
+    const btn = e.target.closest('.btn-filter');
+    if (!btn) return;
 
-    } catch (error) {
-        alert(`Voice upload failed: ${error.message}`);
-    } finally {
-        elements.uploadVoiceBtn.disabled = false;
-        elements.uploadVoiceBtn.textContent = 'Upload Voice';
+    // Update active state
+    elements.genderFilter.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    state.currentGender = btn.dataset.gender;
+    filterAndRenderVoices();
+}
+
+function selectVoice(voiceId) {
+    const voice = state.edgeVoices.find(v => v.id === voiceId);
+    if (!voice) return;
+
+    state.selectedVoiceId = voiceId;
+    state.selectedVoiceName = `${voice.name} (${voice.locale_name})`;
+
+    // Update UI
+    elements.selectedVoice.hidden = false;
+    elements.selectedVoiceName.textContent = state.selectedVoiceName;
+
+    // Update card selection state
+    elements.voiceGrid.querySelectorAll('.voice-card').forEach(card => {
+        card.classList.toggle('selected', card.dataset.voiceId === voiceId);
+    });
+}
+
+function clearSelectedVoice() {
+    state.selectedVoiceId = null;
+    state.selectedVoiceName = null;
+
+    elements.selectedVoice.hidden = true;
+    elements.selectedVoiceName.textContent = '';
+
+    elements.voiceGrid.querySelectorAll('.voice-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+}
+
+function toggleVoicePreview(voiceId) {
+    const audio = elements.voicePreviewAudio;
+
+    // If same voice is playing, pause it
+    if (state.playingVoiceId === voiceId) {
+        audio.pause();
+        state.playingVoiceId = null;
+        updatePlayingState();
+        return;
     }
+
+    // Stop any current playback
+    audio.pause();
+
+    // Start new preview
+    state.playingVoiceId = voiceId;
+    audio.src = `${API_BASE}/voices/preview/${voiceId}`;
+    audio.play().catch(err => {
+        console.error('Preview playback failed:', err);
+        state.playingVoiceId = null;
+    });
+
+    updatePlayingState();
+}
+
+function handlePreviewEnded() {
+    state.playingVoiceId = null;
+    updatePlayingState();
+}
+
+function updatePlayingState() {
+    elements.voiceGrid.querySelectorAll('.voice-card').forEach(card => {
+        card.classList.toggle('playing', card.dataset.voiceId === state.playingVoiceId);
+    });
 }
 
 // Conversion Process

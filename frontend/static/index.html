@@ -62,10 +62,10 @@
                             Browse Files
                         </button>
                         <input type="file" id="fileInput" hidden
-                               accept=".pdf,.doc,.docx,.epub,.fb2,.mobi">
+                               accept=".pdf,.doc,.docx,.epub,.fb2,.mobi,.png,.jpg,.jpeg,.tiff,.tif,.bmp,.webp">
                     </div>
                     <p class="supported-formats">
-                        Supported: PDF, DOC, DOCX, EPUB, FB2, MOBI
+                        Supported: PDF, DOC, DOCX, EPUB, FB2, MOBI, PNG, JPG, TIFF, BMP, WEBP
                     </p>
                 </div>
 
@@ -87,34 +87,38 @@
             <section class="voice-section card">
                 <h2>Select Voice</h2>
 
-                <div class="form-group">
-                    <label for="voiceSelect">Voice Profile</label>
-                    <select id="voiceSelect" class="form-control">
-                        <option value="">Default Voice</option>
+                <!-- Locale Filter -->
+                <div class="voice-filters">
+                    <select id="localeFilter" class="form-control form-control-sm">
+                        <option value="en-US">English (US)</option>
+                        <option value="en-GB">English (UK)</option>
+                        <option value="en-AU">English (Australia)</option>
+                        <option value="en-IN">English (India)</option>
+                        <option value="en">All English</option>
                     </select>
-                </div>
-
-                <div class="custom-voice-section">
-                    <button type="button" class="btn btn-text" id="toggleCustomVoice">
-                        + Add Custom Voice
-                    </button>
-
-                    <div class="custom-voice-form" id="customVoiceForm" hidden>
-                        <div class="form-group">
-                            <label for="voiceName">Voice Name</label>
-                            <input type="text" id="voiceName" class="form-control"
-                                   placeholder="My Custom Voice">
-                        </div>
-                        <div class="form-group">
-                            <label for="voiceFile">Voice Sample (WAV/MP3)</label>
-                            <input type="file" id="voiceFile" class="form-control"
-                                   accept=".wav,.mp3">
-                        </div>
-                        <button type="button" class="btn btn-secondary" id="uploadVoiceBtn">
-                            Upload Voice
-                        </button>
+                    <div class="gender-filter">
+                        <button type="button" class="btn-filter active" data-gender="all">All</button>
+                        <button type="button" class="btn-filter" data-gender="Female">Female</button>
+                        <button type="button" class="btn-filter" data-gender="Male">Male</button>
                     </div>
                 </div>
+
+                <!-- Voice Grid -->
+                <div class="voice-grid" id="voiceGrid">
+                    <!-- Voice cards populated by JavaScript -->
+                </div>
+
+                <!-- Currently Selected Voice -->
+                <div class="selected-voice" id="selectedVoice" hidden>
+                    <span class="selected-voice-label">Selected:</span>
+                    <span class="selected-voice-name" id="selectedVoiceName"></span>
+                    <button type="button" class="btn-icon" id="clearVoice" aria-label="Clear selection">
+                        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+
+                <!-- Hidden audio element for preview playback -->
+                <audio id="voicePreviewAudio" hidden></audio>
             </section>
 
             <!-- Convert Button -->

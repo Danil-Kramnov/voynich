@@ -1,73 +1,78 @@
 # Voynich
 
-Document to audiobook converter. Upload a PDF, EPUB, DOCX, or FB2 and get an MP3 audiobook.
+Document to audiobook converter. Upload documents or images and get an MP3 audiobook.
 
-Uses Microsoft Edge TTS for high-quality speech synthesis with 200+ voices.
+Uses Microsoft Edge TTS for high-quality speech synthesis with 40+ English voices (and 300+ total across languages).
+
+## Features
+
+- **Multiple formats**: PDF, EPUB, DOCX, FB2, MOBI
+- **Image/OCR support**: PNG, JPG, TIFF, BMP, WEBP - extracts text from images
+- **Scanned PDF detection**: Automatically uses OCR when PDFs contain scanned images
+- **Voice selection**: Choose from 40+ English voices with live preview
+- **Conversion queue**: Track multiple conversions with progress and ETA
+- **Dark mode**: Toggle between light and dark themes
 
 ## Requirements
 
 - Python 3.9+
-- Docker (for PostgreSQL and Redis)
-- FFmpeg
+- Docker (for Redis)
+- Tesseract OCR (for image/scanned document support)
 
 ## Setup
 
-### 1. Start Docker containers
+### 1. Start Redis
 
 ```bash
 docker run -d --name redis -p 6379:6379 redis
-docker run -d --name postgres -p 5432:5432 -e POSTGRES_PASSWORD=yourpassword postgres
 ```
 
-### 2. Install dependencies
+### 2. Install Tesseract OCR
+
+**Windows:**
+Download from: https://github.com/UB-Mannheim/tesseract/wiki
+
+Or via chocolatey:
+```powershell
+choco install tesseract
+```
+
+**macOS:**
+```bash
+brew install tesseract
+```
+
+**Linux:**
+```bash
+sudo apt install tesseract-ocr
+```
+
+### 3. Install Python dependencies
 
 **Windows:**
 ```powershell
-cd backend
 python -m venv venv
 venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 ```
 
 **macOS/Linux:**
 ```bash
-cd backend
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 3. Configure environment
-
-Create `backend/.env`:
-```
-DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/postgres
-REDIS_URL=redis://localhost:6379
-CELERY_BROKER_URL=redis://localhost:6379/0
-CELERY_RESULT_BACKEND=redis://localhost:6379/1
-```
-
-### 4. Run migrations
-
-```bash
-cd backend
-alembic upgrade head
+pip install -r backend/requirements.txt
 ```
 
 ## Running
 
 **Windows:**
 ```
-start.bat    # start everything
-stop.bat     # stop everything
-status.bat   # check status
+start.bat
 ```
 
 **macOS/Linux:**
 ```bash
-./start.sh   # start everything
-./stop.sh    # stop everything
-./status.sh  # check status
+./start.sh
 ```
 
 Open http://localhost:8000
@@ -77,4 +82,5 @@ API docs at http://localhost:8000/docs
 ## Notes
 
 - Requires internet connection (edge-tts uses Microsoft's online TTS service)
-- Max upload size is 500MB by default
+- Voice previews are cached after first playback
+- OCR quality depends on image resolution (300 DPI recommended for scanned documents)

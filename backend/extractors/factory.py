@@ -4,6 +4,7 @@ from extractors.pdf_extractor import PDFExtractor
 from extractors.docx_extractor import DOCXExtractor
 from extractors.epub_extractor import EPUBExtractor
 from extractors.fb2_extractor import FB2Extractor
+from extractors.image_extractor import ImageExtractor
 
 class ExtractorFactory:
     _extractors = [
@@ -11,6 +12,7 @@ class ExtractorFactory:
         DOCXExtractor(),
         EPUBExtractor(),
         FB2Extractor(),
+        ImageExtractor(),
     ]
     
     @classmethod

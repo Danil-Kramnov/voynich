@@ -49,9 +49,8 @@ def convert_to_audiobook(self, conversion_id: int):
 
         tts_manager = TTSManager(settings.voices_dir)
 
-        voice_file = None
-        if conversion.voice_id:
-            voice_file = os.path.join(settings.voices_dir, conversion.voice_id)
+        # voice_id is now an edge-tts voice name (e.g., "en-US-AriaNeural")
+        voice_name = conversion.voice_id if conversion.voice_id else None
 
         temp_audio_files = []
         total_chunks = len(chunks)
@@ -62,7 +61,7 @@ def convert_to_audiobook(self, conversion_id: int):
 
         for idx, chunk in enumerate(chunks):
             temp_output = os.path.join(tempfile.gettempdir(), f"chunk_{conversion_id}_{idx}.mp3")
-            tts_manager.synthesize(chunk, temp_output, voice_file)
+            tts_manager.synthesize(chunk, temp_output, voice_name)
             temp_audio_files.append(temp_output)
 
             progress = ((idx + 1) / total_chunks) * 100

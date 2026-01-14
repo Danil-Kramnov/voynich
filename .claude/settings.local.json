@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(./venv/Scripts/python:*)"
+      "Bash(./venv/Scripts/python:*)",
+      "Bash(python:*)",
+      "Bash(source ../venv/Scripts/activate)",
+      "Bash(curl:*)",
+      "Bash(./venv/Scripts/pip:*)"
     ]
   }
 }

@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from models.database import get_db
 from models.conversion import Conversion, ConversionStatus
@@ -16,12 +16,12 @@ settings = get_settings()
 @router.post("/upload", response_model=ConversionResponse)
 async def upload_file(
     file: UploadFile = File(...),
-    voice_id: str = None,
+    voice_id: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     file_ext = os.path.splitext(file.filename)[1]
-    supported_formats = ['.pdf', '.doc', '.docx', '.epub', '.fb2', '.mobi']
-    
+    supported_formats = ['.pdf', '.doc', '.docx', '.epub', '.fb2', '.mobi', '.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp', '.webp']
+
     if file_ext.lower() not in supported_formats:
         raise HTTPException(status_code=400, detail="Unsupported file format")
     
