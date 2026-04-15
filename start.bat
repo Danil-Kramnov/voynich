@@ -18,7 +18,7 @@ if errorlevel 1 (
 docker ps | findstr postgres >nul 2>&1
 if errorlevel 1 (
     echo Starting PostgreSQL...
-    docker start postgres 2>nul || docker run -d --name postgres -p 5432:5432 -e POSTGRES_PASSWORD=yourpassword postgres
+    docker start postgres 2>nul || docker run -d --name postgres -p 5432:5432 -e POSTGRES_PASSWORD=123 postgres
 )
 echo [OK] Docker containers running
 echo.
