@@ -35,6 +35,12 @@ class TTSManager:
         asyncio.run(self._synthesize_async(text, output_path, voice))
         return output_path
 
+    async def synthesize_async(self, text: str, output_path: str, voice_file: Optional[str] = None):
+        text = self._normalize_for_tts(text)
+        voice = voice_file if voice_file else self.default_voice
+        communicate = edge_tts.Communicate(text, voice)
+        await communicate.save(output_path)
+
     async def _synthesize_async(self, text: str, output_path: str, voice: str):
         communicate = edge_tts.Communicate(text, voice)
         await communicate.save(output_path)

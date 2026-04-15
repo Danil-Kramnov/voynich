@@ -111,6 +111,28 @@ async def cancel_all_conversions(db: Session = Depends(get_db)):
     return {"cancelled": cancelled_count}
 
 
+@router.post("/retry/{conversion_id}", response_model=ConversionResponse)
+async def retry_conversion(conversion_id: int, db: Session = Depends(get_db)):
+    conversion = db.query(Conversion).filter(Conversion.id == conversion_id).first()
+
+    if not conversion:
+        raise HTTPException(status_code=404, detail="Conversion not found")
+
+    if conversion.status not in [ConversionStatus.FAILED, ConversionStatus.CANCELLED]:
+        raise HTTPException(status_code=400, detail="Only failed or cancelled conversions can be retried")
+
+    conversion.status = ConversionStatus.PENDING
+    conversion.error_message = None
+    db.commit()
+
+    task = convert_to_audiobook.delay(conversion.id)
+    conversion.task_id = task.id
+    db.commit()
+    db.refresh(conversion)
+
+    return conversion
+
+
 @router.delete("/clear-completed")
 async def clear_completed_conversions(db: Session = Depends(get_db)):
     """Remove all completed, failed, and cancelled conversions from database"""

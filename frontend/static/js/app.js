@@ -13,6 +13,7 @@ const state = {
     currentLocale: 'en-US',
     currentGender: 'all',
     playingVoiceId: null,
+    loadingVoiceId: null,
     theme: 'light',
     tasks: [],
     taskPollingInterval: null
@@ -274,11 +275,13 @@ function createVoiceCardHTML(voice) {
         ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M12 13v8"/><path d="M9 18h6"/></svg>'
         : '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M12 13v8"/><path d="M15 15l3-3"/><path d="M18 15v-3h-3"/></svg>';
 
+    const isLoading = state.loadingVoiceId === voice.id;
     return `
-        <div class="voice-card${isSelected ? ' selected' : ''}${isPlaying ? ' playing' : ''}" data-voice-id="${voice.id}">
+        <div class="voice-card${isSelected ? ' selected' : ''}${isPlaying ? ' playing' : ''}${isLoading ? ' loading' : ''}" data-voice-id="${voice.id}">
             <button class="voice-preview-btn" aria-label="Preview voice">
                 <svg class="icon-play" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 <svg class="icon-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                <svg class="icon-loading" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
             </button>
             <div class="voice-info">
                 <div class="voice-name">${escapeHTML(voice.name)}</div>
@@ -344,6 +347,7 @@ function toggleVoicePreview(voiceId) {
     if (state.playingVoiceId === voiceId) {
         audio.pause();
         state.playingVoiceId = null;
+        state.loadingVoiceId = null;
         updatePlayingState();
         return;
     }
@@ -353,10 +357,18 @@ function toggleVoicePreview(voiceId) {
 
     // Start new preview
     state.playingVoiceId = voiceId;
+    state.loadingVoiceId = voiceId;
     audio.src = `${API_BASE}/voices/preview/${voiceId}`;
+
+    audio.oncanplay = () => {
+        state.loadingVoiceId = null;
+        updatePlayingState();
+    };
+
     audio.play().catch(err => {
         console.error('Preview playback failed:', err);
         state.playingVoiceId = null;
+        state.loadingVoiceId = null;
     });
 
     updatePlayingState();
@@ -369,7 +381,9 @@ function handlePreviewEnded() {
 
 function updatePlayingState() {
     elements.voiceGrid.querySelectorAll('.voice-card').forEach(card => {
-        card.classList.toggle('playing', card.dataset.voiceId === state.playingVoiceId);
+        const id = card.dataset.voiceId;
+        card.classList.toggle('playing', id === state.playingVoiceId && id !== state.loadingVoiceId);
+        card.classList.toggle('loading', id === state.loadingVoiceId);
     });
 }
 
@@ -656,6 +670,15 @@ function renderTaskList() {
         });
     });
 
+    // Attach retry button listeners
+    elements.taskList.querySelectorAll('.task-retry-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const taskId = e.target.closest('.task-row').dataset.id;
+            retryTask(taskId);
+        });
+    });
+
     // Attach remove button listeners
     elements.taskList.querySelectorAll('.task-remove-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -689,6 +712,15 @@ function createTaskRowHTML(task) {
             <a class="task-download-btn" href="/outputs/${task.output_path}" download title="Download">
                 <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             </a>
+            <button class="task-remove-btn" aria-label="Remove from list" title="Remove">
+                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        `;
+    } else if (task.status === 'failed') {
+        actionsHTML = `
+            <button class="task-retry-btn" aria-label="Retry conversion" title="Retry from where it stopped">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.87"/></svg>
+            </button>
             <button class="task-remove-btn" aria-label="Remove from list" title="Remove">
                 <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
@@ -755,6 +787,24 @@ function formatETA(task) {
     }
 
     return `${minutes}m ${remainingSeconds}s`;
+}
+
+async function retryTask(taskId) {
+    try {
+        const response = await fetch(`${API_BASE}/conversion/retry/${taskId}`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Retry failed');
+        }
+
+        await loadTasks();
+
+    } catch (error) {
+        alert(`Failed to retry: ${error.message}`);
+    }
 }
 
 async function cancelTask(taskId) {

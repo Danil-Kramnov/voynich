@@ -16,6 +16,8 @@ from pydantic import BaseModel
 router = APIRouter()
 settings = get_settings()
 
+_edge_voices_cache = None
+
 # Preview text for voice samples
 PREVIEW_TEXT = "Hello! This is a preview of my voice. I can read your books and documents aloud."
 
@@ -87,8 +89,11 @@ async def list_voices(db: Session = Depends(get_db)):
 @router.get("/edge-voices", response_model=List[EdgeVoice])
 async def list_edge_voices(locale_filter: str = "en"):
     """List available edge-tts voices, filtered by locale prefix."""
+    global _edge_voices_cache
     try:
-        voices = await edge_tts.list_voices()
+        if _edge_voices_cache is None:
+            _edge_voices_cache = await edge_tts.list_voices()
+        voices = _edge_voices_cache
 
         # Filter and transform voices
         result = []

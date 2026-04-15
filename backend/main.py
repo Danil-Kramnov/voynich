@@ -10,6 +10,8 @@ from pathlib import Path
 
 settings = get_settings()
 
+print(f"[DEBUG] DATABASE_URL in use: {settings.database_url}")
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Voynich API")

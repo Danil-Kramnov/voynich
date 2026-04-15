@@ -977,12 +977,30 @@ select.form-control {
     display: none;
 }
 
+.voice-preview-btn .icon-loading {
+    display: none;
+}
+
 .voice-card.playing .voice-preview-btn .icon-play {
     display: none;
 }
 
 .voice-card.playing .voice-preview-btn .icon-pause {
     display: block;
+}
+
+.voice-card.loading .voice-preview-btn .icon-play {
+    display: none;
+}
+
+.voice-card.loading .voice-preview-btn .icon-loading {
+    display: block;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 .voice-info {
